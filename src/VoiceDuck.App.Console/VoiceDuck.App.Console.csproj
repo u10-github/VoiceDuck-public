@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\VoiceDuck.Core\VoiceDuck.Core.csproj" />
+    <ProjectReference Include="..\VoiceDuck.Extensions.WindowsAudio\VoiceDuck.Extensions.WindowsAudio.csproj" />
+    <ProjectReference Include="..\VoiceDuck.Infrastructure\VoiceDuck.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

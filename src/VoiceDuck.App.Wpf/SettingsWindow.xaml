@@ -1,0 +1,51 @@
+<Window x:Class="VoiceDuck.App.Wpf.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="VoiceDuck Settings" Height="440" Width="400"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0">
+            <StackPanel>
+                <GroupBox Header="Ducking Settings" Margin="0,0,0,12">
+                    <StackPanel Margin="8">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                            <TextBlock Text="Ducking Ratio:" Width="130" VerticalAlignment="Center"/>
+                            <TextBox x:Name="RatioBox" Text="0.30" Width="80"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Restore Delay (s):" Width="130" VerticalAlignment="Center"/>
+                            <TextBox x:Name="DelayBox" Text="10" Width="80"/>
+                        </StackPanel>
+                    </StackPanel>
+                </GroupBox>
+
+                <GroupBox Header="Trigger Apps" Margin="0,0,0,12">
+                    <StackPanel Margin="8" x:Name="TriggerPanel">
+                        <TextBlock Text="Loading..." Margin="0,4"/>
+                    </StackPanel>
+                </GroupBox>
+
+                <GroupBox Header="Exclude Apps" Margin="0,0,0,12">
+                    <StackPanel Margin="8">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                            <TextBox x:Name="ExcludeNameBox" Width="150" ToolTip="Process name (e.g. Game.exe)"/>
+                            <Button Content="Add" Click="AddExclude_Click" Width="60" Margin="6,0,0,0"/>
+                            <Button Content="Remove" Click="RemoveExclude_Click" Width="70" Margin="6,0,0,0"/>
+                        </StackPanel>
+                        <ListBox x:Name="ExcludeList" MaxHeight="100"/>
+                    </StackPanel>
+                </GroupBox>
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="Save" Click="Save_Click" Width="80" Margin="0,0,8,0" IsDefault="True"/>
+            <Button Content="Cancel" Click="Cancel_Click" Width="80" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

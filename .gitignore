@@ -1,0 +1,30 @@
+.agent/
+
+## Build output
+dist/
+
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstats
+*.userprefs
+packages/
+*.nupkg
+
+## NuGet
+# packages.lock.json は dotnet restore --locked-mode で必要なのでリポジトリに含める
+# 除外しない
+
+## JetBrains Rider
+.idea/
+*.sln.iml
+
+## VS Code
+.vscode/
+
+## OS
+.DS_Store
+Thumbs.db
