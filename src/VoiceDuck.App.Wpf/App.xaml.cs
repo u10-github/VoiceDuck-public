@@ -260,22 +260,20 @@ public partial class App
     {
         try
         {
-            var entry = $"""
-                === VoiceDuck Crash Log ===
-                Timestamp: {DateTime.Now:yyyy-MM-dd HH:mm:ss}
-                Source: {source}
-                Marker: {_startupMarker}
-                Exception: {ex}
-                Executable: {Environment.ProcessPath}
-                BaseDirectory: {AppDomain.CurrentDomain.BaseDirectory}
-                CurrentDirectory: {Environment.CurrentDirectory}
-                Is64BitProcess: {Environment.Is64BitProcess}
-                OSVersion: {Environment.OSVersion}
-                CLRVersion: {Environment.Version}
-                ProcessId: {Environment.ProcessId}
-                =============================
-                """;
-            System.IO.File.AppendAllText(_crashLogPath, entry);
+            System.IO.File.AppendAllText(_crashLogPath,
+                "=== VoiceDuck Crash Log ===" + Environment.NewLine +
+                "Timestamp: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + Environment.NewLine +
+                "Source: " + source + Environment.NewLine +
+                "Marker: " + _startupMarker + Environment.NewLine +
+                "Exception: " + ex + Environment.NewLine +
+                "Executable: " + Environment.ProcessPath + Environment.NewLine +
+                "BaseDirectory: " + AppDomain.CurrentDomain.BaseDirectory + Environment.NewLine +
+                "CurrentDirectory: " + Environment.CurrentDirectory + Environment.NewLine +
+                "Is64BitProcess: " + Environment.Is64BitProcess + Environment.NewLine +
+                "OSVersion: " + Environment.OSVersion + Environment.NewLine +
+                "CLRVersion: " + Environment.Version + Environment.NewLine +
+                "ProcessId: " + Environment.ProcessId + Environment.NewLine +
+                "=============================");
         }
         catch
         {
