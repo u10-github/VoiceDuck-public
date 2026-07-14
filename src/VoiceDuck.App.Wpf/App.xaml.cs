@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Drawing;
+using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Forms;
 using VoiceDuck.Core;
@@ -13,59 +15,130 @@ public partial class App
     private MainWindow? _mainWindow;
     private ToolStripMenuItem? _manualDuckItem;
 
-    protected override void OnStartup(StartupEventArgs e)
+    private string _startupMarker = "none";
+    private string _crashLogPath = "startup-crash.log";
+
+    public App()
     {
-        base.OnStartup(e);
+        ResolveCrashLogPath();
 
-        var logDirectory = System.IO.Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "VoiceDuck",
-            "logs");
-        _logger = new SimpleLogger(logDirectory);
-        _logger.Info("Application starting");
-
-        var settingsPath = System.IO.Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "VoiceDuck",
-            "settings.json");
-
-        _orchestrator = new DuckingOrchestrator(settingsPath, _logger);
-        _orchestrator.PhaseChanged += OnPhaseChanged;
-
-        _notifyIcon = new NotifyIcon
+        DispatcherUnhandledException += (_, e) =>
         {
-            Icon = Icon.ExtractAssociatedIcon(
-                System.Diagnostics.Process.GetCurrentProcess().MainModule!.FileName),
-            Text = "VoiceDuck",
-            Visible = true
+            WriteCrashLog("DispatcherUnhandledException", e.Exception);
+            Environment.Exit(1);
         };
 
-        _manualDuckItem = new ToolStripMenuItem("Duck ON");
-        _manualDuckItem.Click += OnManualDuckClick;
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            var ex = e.ExceptionObject as Exception;
+            WriteCrashLog("AppDomain.UnhandledException", ex ?? new Exception("Non-exception object"));
+            Environment.Exit(1);
+        };
 
-        var settingsItem = new ToolStripMenuItem("Settings...");
-        settingsItem.Click += (_, _) => OpenSettingsWindow();
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            WriteCrashLog("TaskScheduler.UnobservedTaskException", e.Exception);
+            e.SetObserved();
+        };
+    }
 
-        var viewLogItem = new ToolStripMenuItem("View Log");
-        viewLogItem.Click += (_, _) => OpenLogFolder();
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        _startupMarker = "startup.01: base.OnStartup";
+        base.OnStartup(e);
 
-        var contextMenu = new ContextMenuStrip();
-        contextMenu.Items.Add("Show", null, (_, _) => ShowMainWindow());
-        contextMenu.Items.Add(new ToolStripSeparator());
-        contextMenu.Items.Add(_manualDuckItem);
-        contextMenu.Items.Add(new ToolStripSeparator());
-        contextMenu.Items.Add(settingsItem);
-        contextMenu.Items.Add(viewLogItem);
-        contextMenu.Items.Add(new ToolStripSeparator());
-        contextMenu.Items.Add("Exit", null, (_, _) => ExitApp());
-        _notifyIcon.ContextMenuStrip = contextMenu;
+        try
+        {
+            _startupMarker = "startup.02: logger init";
+            var logDirectory = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "VoiceDuck",
+                "logs");
+            _logger = new SimpleLogger(logDirectory);
+            _logger.Info("Application starting");
 
-        _orchestrator.Start();
+            _startupMarker = "startup.03: settings path";
+            var settingsPath = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "VoiceDuck",
+                "settings.json");
+            _logger.Info($"startup.03: settings={settingsPath}");
 
-        _mainWindow = new MainWindow();
-        _mainWindow.SetSettingsInfo(_orchestrator.Settings.Policy.DuckingRatio.ToString("F2"));
-        _mainWindow.Orchestrator = _orchestrator;
-        _mainWindow.Show();
+            _startupMarker = "startup.04: orchestrator construct";
+            _orchestrator = new DuckingOrchestrator(settingsPath, _logger);
+            _orchestrator.PhaseChanged += OnPhaseChanged;
+            _logger.Info("startup.04: orchestrator constructed");
+
+            _startupMarker = "startup.05: icon extraction";
+            var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule!.FileName;
+            Icon icon;
+            try
+            {
+                icon = Icon.ExtractAssociatedIcon(exePath) ?? SystemIcons.Application;
+                _logger.Info($"startup.05: icon extracted from {exePath}");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"startup.05: ExtractAssociatedIcon failed for {exePath}", ex);
+                icon = SystemIcons.Application;
+            }
+
+            _startupMarker = "startup.06: NotifyIcon";
+            _notifyIcon = new NotifyIcon
+            {
+                Icon = icon,
+                Text = "VoiceDuck",
+                Visible = true
+            };
+            _logger.Info("startup.06: NotifyIcon created");
+
+            _startupMarker = "startup.07: context menu";
+            _manualDuckItem = new ToolStripMenuItem("Duck ON");
+            _manualDuckItem.Click += OnManualDuckClick;
+
+            var settingsItem = new ToolStripMenuItem("Settings...");
+            settingsItem.Click += (_, _) => OpenSettingsWindow();
+
+            var viewLogItem = new ToolStripMenuItem("View Log");
+            viewLogItem.Click += (_, _) => OpenLogFolder();
+
+            var contextMenu = new ContextMenuStrip();
+            contextMenu.Items.Add("Show", null, (_, _) => ShowMainWindow());
+            contextMenu.Items.Add(new ToolStripSeparator());
+            contextMenu.Items.Add(_manualDuckItem);
+            contextMenu.Items.Add(new ToolStripSeparator());
+            contextMenu.Items.Add(settingsItem);
+            contextMenu.Items.Add(viewLogItem);
+            contextMenu.Items.Add(new ToolStripSeparator());
+            contextMenu.Items.Add("Exit", null, (_, _) => ExitApp());
+            _notifyIcon.ContextMenuStrip = contextMenu;
+            _logger.Info("startup.07: context menu created");
+
+            _startupMarker = "startup.08: orchestrator.Start";
+            _orchestrator.Start();
+            _logger.Info("startup.08: orchestrator started");
+
+            _startupMarker = "startup.09: MainWindow construct";
+            _mainWindow = new MainWindow();
+            _logger.Info("startup.09: MainWindow constructed");
+
+            _startupMarker = "startup.10: MainWindow configure";
+            _mainWindow.SetSettingsInfo(_orchestrator.Settings.Policy.DuckingRatio.ToString("F2"));
+            _mainWindow.Orchestrator = _orchestrator;
+
+            _startupMarker = "startup.11: MainWindow.Show";
+            _mainWindow.Show();
+            _logger.Info("startup.11: MainWindow shown");
+
+            _startupMarker = "startup.12: startup complete";
+            _logger.Info("startup completed successfully");
+        }
+        catch (Exception ex)
+        {
+            WriteCrashLog($"OnStartup (marker={_startupMarker})", ex);
+            _logger?.Error($"Startup failed at {_startupMarker}", ex);
+            throw;
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -158,5 +231,55 @@ public partial class App
             return;
 
         _manualDuckItem.Text = _orchestrator.IsManualDucking ? "Duck OFF" : "Duck ON";
+    }
+
+    private void ResolveCrashLogPath()
+    {
+        try
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var logDir = System.IO.Path.Combine(appData, "VoiceDuck", "logs");
+            System.IO.Directory.CreateDirectory(logDir);
+            _crashLogPath = System.IO.Path.Combine(logDir, "startup-crash.log");
+        }
+        catch
+        {
+            try
+            {
+                var tempDir = System.IO.Path.GetTempPath();
+                _crashLogPath = System.IO.Path.Combine(tempDir, "VoiceDuck-startup-crash.log");
+            }
+            catch
+            {
+                // Keep default "startup-crash.log"
+            }
+        }
+    }
+
+    private void WriteCrashLog(string source, Exception ex)
+    {
+        try
+        {
+            var entry = $"""
+                === VoiceDuck Crash Log ===
+                Timestamp: {DateTime.Now:yyyy-MM-dd HH:mm:ss}
+                Source: {source}
+                Marker: {_startupMarker}
+                Exception: {ex}
+                Executable: {Environment.ProcessPath}
+                BaseDirectory: {AppDomain.CurrentDomain.BaseDirectory}
+                CurrentDirectory: {Environment.CurrentDirectory}
+                Is64BitProcess: {Environment.Is64BitProcess}
+                OSVersion: {Environment.OSVersion}
+                CLRVersion: {Environment.Version}
+                ProcessId: {Environment.ProcessId}
+                =============================
+                """;
+            System.IO.File.AppendAllText(_crashLogPath, entry);
+        }
+        catch
+        {
+            // Swallow secondary exceptions — must not hide the original failure
+        }
     }
 }

@@ -14,13 +14,13 @@
     with -p:RestorePackagesWithLockFile=false, then restores them in a
     finally block. The CI no-RID restore path is unaffected.
 .PARAMETER OutputDir
-    Output directory. Default: dist/VoiceDuck-SelfContained
+    Output directory. Default: dist/VoiceDuck
 .EXAMPLE
     .\scripts\publish-self-contained.ps1
 #>
 
 param(
-    [string]$OutputDir = "dist/VoiceDuck-SelfContained"
+    [string]$OutputDir = "dist/VoiceDuck"
 )
 
 $ErrorActionPreference = "Stop"
@@ -36,7 +36,7 @@ Write-Host ""
 
 # Resolve output directory
 $OutPath = Join-Path $RepoRoot $OutputDir
-$ZipPath = Join-Path $RepoRoot "dist/VoiceDuck-SelfContained.zip"
+$ZipPath = Join-Path $RepoRoot "dist/VoiceDuck.zip"
 
 if (Test-Path $OutPath) {
     Remove-Item -Recurse -Force $OutPath
@@ -83,14 +83,14 @@ try {
     if (Test-Path $ZipPath) {
         Remove-Item -Force $ZipPath
     }
-    Compress-Archive -Path $OutPath\* -DestinationPath $ZipPath
+    Compress-Archive -Path $OutPath -DestinationPath $ZipPath
 
     # Summary
     Write-Host "`n=== Done ===" -ForegroundColor Green
     Write-Host "Published files: $OutPath"
     Write-Host "Zip archive: $ZipPath"
     Write-Host "Size: $((Get-Item $ZipPath).Length / 1MB) MB"
-    Write-Host "`nTo run: $OutPath\VoiceDuck.App.Wpf.exe"
+    Write-Host "`nTo run: $OutPath\VoiceDuck.exe"
     Write-Host "`nNote: Self-contained package. No .NET runtime installation needed."
 }
 finally {

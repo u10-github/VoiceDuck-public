@@ -7,7 +7,12 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>VoiceDuck</AssemblyName>
+    <ApplicationIcon>Assets\icon_VoiceDuck.ico</ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets\icon_VoiceDuck.png" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\VoiceDuck.Core\VoiceDuck.Core.csproj" />
     <ProjectReference Include="..\..\src\VoiceDuck.Extensions.WindowsAudio\VoiceDuck.Extensions.WindowsAudio.csproj" />

@@ -7,19 +7,15 @@ namespace VoiceDuck.Extensions.WindowsAudio;
 
 public class WindowsAudioSessionVolumeWriter : IAudioSessionVolumeWriter
 {
-    public void SetVolume(AudioSessionIdentity identity, float volume)
+    public VolumeWriteResult SetVolume(AudioSessionIdentity identity, float volume)
     {
         var targetPid = identity.ProcessId;
 
-        // Skip if PID is unresolved (0): matching by PID 0 would match all
-        // unresolved sessions and could accidentally duck protected sessions.
         if (targetPid == 0)
-            return;
+            return VolumeWriteResult.SessionNotFound;
 
-        // Skip if identity is not fully resolved: empty RenderDeviceId or
-        // SessionInstanceIdentifier would collide with other unresolved sessions.
         if (!identity.IsResolved)
-            return;
+            return VolumeWriteResult.SessionNotFound;
 
         var enumerator = new MMDeviceEnumerator();
 
@@ -50,7 +46,7 @@ public class WindowsAudioSessionVolumeWriter : IAudioSessionVolumeWriter
 
                             var volumeControl = control.SimpleAudioVolume;
                             volumeControl.Volume = Math.Clamp(volume, 0.0f, 1.0f);
-                            return; // Exact match found, done
+                            return VolumeWriteResult.Succeeded;
                         }
                         finally
                         {
@@ -64,10 +60,16 @@ public class WindowsAudioSessionVolumeWriter : IAudioSessionVolumeWriter
                 }
             }
         }
+        catch
+        {
+            return VolumeWriteResult.Failed;
+        }
         finally
         {
             enumerator.Dispose();
         }
+
+        return VolumeWriteResult.SessionNotFound;
     }
 
     private static uint TryGetProcessId(AudioSessionControl control)

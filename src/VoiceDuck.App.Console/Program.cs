@@ -96,9 +96,9 @@ void RunOneShot(bool duckOnce, bool restore)
     var settings = repository.LoadOrDefault();
 
     var classifier = new DuckingSessionClassifier();
-    var snapshotStore = new VolumeSnapshotStore();
+    var stateStore = new ApplicationVolumeStateStore();
     var volumeWriter = new WindowsAudioSessionVolumeWriter();
-    var duckingService = new VolumeDuckingService(volumeWriter, classifier, snapshotStore);
+    var duckingService = new VolumeDuckingService(volumeWriter, classifier, stateStore);
 
     if (duckOnce)
     {
@@ -126,17 +126,17 @@ void RunOneShot(bool duckOnce, bool restore)
 
             Console.WriteLine("Ducking applied once.");
 
-            var snapshots = snapshotStore.GetAll();
-            if (snapshots.Count > 0)
+            var states = stateStore.GetAll();
+            if (states.Count > 0)
             {
                 Console.WriteLine();
-                Console.WriteLine("Snapshots saved:");
-                foreach (var snap in snapshots)
-                    Console.WriteLine($"  {snap.SessionIdentity.ProcessName} pid={snap.SessionIdentity.ProcessId} originalVolume={snap.OriginalVolume:F2}");
+                Console.WriteLine("App states created:");
+                foreach (var state in states)
+                    Console.WriteLine($"  {state.Identity}: baseline={state.BaselineVolume:F2} ducked={state.IsDucked}");
             }
             else
             {
-                Console.WriteLine("No snapshots saved (all sessions were protected or skipped).");
+                Console.WriteLine("No states created (all sessions were protected or skipped).");
             }
         }
         catch (Exception ex)
@@ -149,18 +149,20 @@ void RunOneShot(bool duckOnce, bool restore)
     {
         Console.WriteLine("=== Restore ===");
 
-        var restoreSnapshots = snapshotStore.GetAll();
-        if (restoreSnapshots.Count == 0 && !duckOnce)
+        var restoreStates = stateStore.GetAll();
+        if (restoreStates.Count == 0 && !duckOnce)
         {
-            Console.WriteLine("No snapshots are available in this process. Use --duck-once --restore in the same command to test restore.");
+            Console.WriteLine("No states are available in this process. Use --duck-once --restore in the same command to test restore.");
         }
         else
         {
-            Console.WriteLine($"Snapshots to restore: {restoreSnapshots.Count}");
+            Console.WriteLine($"States to restore: {restoreStates.Count}");
 
             try
             {
-                duckingService.RestoreVolumes();
+                var sessionService = new WindowsAudioSessionService();
+                var sessions = sessionService.GetAllSessions();
+                duckingService.RestoreVolumes(sessions);
                 Console.WriteLine("Volumes restored to original values.");
             }
             catch (Exception ex)
@@ -194,9 +196,9 @@ void RunContinuousMonitoring()
 
     var stateMachine = new DuckingStateMachine();
     var classifier = new DuckingSessionClassifier();
-    var snapshotStore = new VolumeSnapshotStore();
+    var stateStore = new ApplicationVolumeStateStore();
     var volumeWriter = new WindowsAudioSessionVolumeWriter();
-    var duckingService = new VolumeDuckingService(volumeWriter, classifier, snapshotStore);
+    var duckingService = new VolumeDuckingService(volumeWriter, classifier, stateStore);
     var sessionService = new WindowsAudioSessionService();
     var micService = new WindowsMicrophoneStateService();
     DateTimeOffset? restoreDueAt = null;
@@ -243,10 +245,10 @@ void RunContinuousMonitoring()
                     {
                         var sessions = sessionService.GetAllSessions();
                         duckingService.ApplyDucking(sessions, settings, currentProcessName);
-                        var snapshots = snapshotStore.GetAll();
-                        Console.WriteLine($"  Ducking: {snapshots.Count} session(s)");
-                        foreach (var snap in snapshots)
-                            Console.WriteLine($"    {snap.SessionIdentity.ProcessName}: {snap.OriginalVolume:F2} -> {settings.Policy.ComputeDuckedVolume(snap.OriginalVolume):F2}");
+                        var states = stateStore.GetAll();
+                        Console.WriteLine($"  Ducking: {states.Count} app(s)");
+                        foreach (var state in states)
+                            Console.WriteLine($"    {state.Identity}: baseline={state.BaselineVolume:F2} target={settings.Policy.ComputeDuckedVolume(state.BaselineVolume):F2}");
                         restoreDueAt = null;
                         break;
                     }
@@ -271,15 +273,18 @@ void RunContinuousMonitoring()
                     }
                 case DuckingPhase.Restoring:
                     {
-                        var count = snapshotStore.Count;
-                        duckingService.RestoreVolumes();
-                        Console.WriteLine($"  Restored: {count} session(s) to original volumes");
+                        var count = stateStore.Count;
+                        var sessions = sessionService.GetAllSessions();
+                        duckingService.RestoreVolumes(sessions);
+                        Console.WriteLine($"  Restored: {count} app(s) to original volumes");
                         stateMachine.NotifyRestoreCompleted();
                         restoreDueAt = null;
                         break;
                     }
                 case DuckingPhase.Idle:
                     {
+                        var sessions = sessionService.GetAllSessions();
+                        duckingService.ApplyDeferredRestores(sessions);
                         restoreDueAt = null;
                         break;
                     }
@@ -296,13 +301,14 @@ void RunContinuousMonitoring()
         Thread.Sleep(3000);
     }
 
-    if (snapshotStore.Count > 0)
+    if (stateStore.Count > 0)
     {
         Console.WriteLine();
         Console.WriteLine("Shutting down, restoring volumes...");
         try
         {
-            duckingService.RestoreVolumes();
+            var sessions = sessionService.GetAllSessions();
+            duckingService.RestoreVolumes(sessions);
             Console.WriteLine("Volumes restored on shutdown.");
         }
         catch (Exception ex)

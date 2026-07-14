@@ -46,12 +46,12 @@ Write-Host "`n=== Create zip archive ===" -ForegroundColor Cyan
 if (Test-Path $ZipPath) {
     Remove-Item -Force $ZipPath
 }
-Compress-Archive -Path $OutPath\* -DestinationPath $ZipPath
+Compress-Archive -Path $OutPath -DestinationPath $ZipPath
 
 # Summary
 Write-Host "`n=== Done ===" -ForegroundColor Green
 Write-Host "Published files: $OutPath"
 Write-Host "Zip archive: $ZipPath"
-Write-Host "`nTo run: $OutPath\VoiceDuck.App.Wpf.exe"
+Write-Host "`nTo run: $OutPath\VoiceDuck.exe"
 Write-Host "`nNote: Requires .NET 8 Desktop Runtime on the target machine."
 Write-Host "  Download: https://dotnet.microsoft.com/en-us/download/dotnet/8.0"

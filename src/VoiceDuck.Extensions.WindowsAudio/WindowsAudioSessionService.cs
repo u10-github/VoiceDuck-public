@@ -30,9 +30,10 @@ public class WindowsAudioSessionService : IAudioSessionService
                         var processId = TryGetProcessId(control);
                         var processName = TryGetProcessName(processId) ?? displayName;
                         var sessionInstanceId = TryGetSessionInstanceIdentifier(control) ?? string.Empty;
+                        var executablePath = TryGetExecutablePath(processId);
 
                         var identity = new AudioSessionIdentity(processId, processName, deviceId, sessionInstanceId);
-                        sessions.Add(new AudioSessionInfo(identity, volume.Volume, volume.Mute));
+                        sessions.Add(new AudioSessionInfo(identity, volume.Volume, volume.Mute, executablePath));
                     }
                     finally
                     {
@@ -80,6 +81,20 @@ public class WindowsAudioSessionService : IAudioSessionService
             if (!name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
                 name += ".exe";
             return name;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string? TryGetExecutablePath(uint processId)
+    {
+        if (processId == 0) return null;
+        try
+        {
+            using var proc = System.Diagnostics.Process.GetProcessById((int)processId);
+            return proc.MainModule?.FileName;
         }
         catch
         {

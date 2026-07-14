@@ -4,16 +4,16 @@ public class VolumeDuckingService
 {
     private readonly IAudioSessionVolumeWriter _volumeWriter;
     private readonly DuckingSessionClassifier _classifier;
-    private readonly VolumeSnapshotStore _snapshotStore;
+    private readonly ApplicationVolumeStateStore _stateStore;
 
     public VolumeDuckingService(
         IAudioSessionVolumeWriter volumeWriter,
         DuckingSessionClassifier classifier,
-        VolumeSnapshotStore snapshotStore)
+        ApplicationVolumeStateStore stateStore)
     {
         _volumeWriter = volumeWriter ?? throw new ArgumentNullException(nameof(volumeWriter));
         _classifier = classifier ?? throw new ArgumentNullException(nameof(classifier));
-        _snapshotStore = snapshotStore ?? throw new ArgumentNullException(nameof(snapshotStore));
+        _stateStore = stateStore ?? throw new ArgumentNullException(nameof(stateStore));
     }
 
     public void ApplyDucking(
@@ -21,33 +21,97 @@ public class VolumeDuckingService
         VoiceDuckSettings settings,
         string voiceDuckProcessName)
     {
-        foreach (var session in sessions)
+        var groups = ApplicationAudioSessionGroup.GroupSessions(
+            sessions, voiceDuckProcessName, _classifier, settings);
+
+        foreach (var group in groups)
         {
-            if (session.Identity.ProcessId == 0 || !session.Identity.IsResolved)
-                continue;
-
-            var decision = _classifier.Classify(session, settings, voiceDuckProcessName);
-            if (decision.Outcome == DuckingOutcome.Protect)
-                continue;
-
-            if (!_snapshotStore.Contains(session.Identity))
+            if (!_stateStore.TryGet(group.Identity, out var existing) || existing is null)
             {
-                _snapshotStore.Add(new VolumeSnapshot(session.Identity, session.Volume));
+                var baseline = group.BaselineFromMaxVolume();
+                existing = new ApplicationVolumeState(
+                    group.Identity, baseline, isDucked: true);
+                _stateStore.Add(existing);
             }
 
-            _snapshotStore.TryGet(session.Identity, out var snapshot);
-            var duckedVolume = settings.Policy.ComputeDuckedVolume(snapshot!.OriginalVolume);
-            _volumeWriter.SetVolume(session.Identity, duckedVolume);
+            if (!existing.IsDucked)
+                existing.SetDucked(true);
+
+            var target = settings.Policy.ComputeDuckedVolume(existing.BaselineVolume);
+
+            foreach (var session in group.Sessions)
+            {
+                _volumeWriter.SetVolume(session.Identity, target);
+            }
         }
     }
 
-    public void RestoreVolumes()
+    public void RestoreVolumes(IReadOnlyList<AudioSessionInfo> currentSessions)
     {
-        foreach (var snapshot in _snapshotStore.GetAll())
+        var toRemove = new List<ApplicationAudioIdentity>();
+
+        foreach (var state in _stateStore.GetAll())
         {
-            _volumeWriter.SetVolume(snapshot.SessionIdentity, snapshot.OriginalVolume);
+            if (!state.IsDucked)
+                continue;
+
+            var matchingSessions = currentSessions
+                .Where(s => s.Identity.IsResolved &&
+                            !string.IsNullOrEmpty(s.ExecutablePath) &&
+                            new ApplicationAudioIdentity(
+                                s.Identity.RenderDeviceId, s.ExecutablePath)
+                                .Equals(state.Identity))
+                .ToList();
+
+            if (matchingSessions.Count == 0)
+                continue;
+
+            var allSucceeded = true;
+
+            foreach (var session in matchingSessions)
+            {
+                var result = _volumeWriter.SetVolume(session.Identity, state.BaselineVolume);
+                if (result != VolumeWriteResult.Succeeded)
+                    allSucceeded = false;
+            }
+
+            if (allSucceeded)
+                toRemove.Add(state.Identity);
         }
 
-        _snapshotStore.Clear();
+        foreach (var identity in toRemove)
+            _stateStore.Remove(identity);
+    }
+
+    public void ApplyDeferredRestores(IReadOnlyList<AudioSessionInfo> sessions)
+    {
+        foreach (var state in _stateStore.GetAll())
+        {
+            if (!state.IsDucked)
+                continue;
+
+            var matchingSessions = sessions
+                .Where(s => s.Identity.IsResolved &&
+                            !string.IsNullOrEmpty(s.ExecutablePath) &&
+                            new ApplicationAudioIdentity(
+                                s.Identity.RenderDeviceId, s.ExecutablePath)
+                                .Equals(state.Identity))
+                .ToList();
+
+            if (matchingSessions.Count == 0)
+                continue;
+
+            var allSucceeded = true;
+
+            foreach (var session in matchingSessions)
+            {
+                var result = _volumeWriter.SetVolume(session.Identity, state.BaselineVolume);
+                if (result != VolumeWriteResult.Succeeded)
+                    allSucceeded = false;
+            }
+
+            if (allSucceeded)
+                _stateStore.Remove(state.Identity);
+        }
     }
 }

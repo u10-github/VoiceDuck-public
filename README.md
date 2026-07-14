@@ -1,16 +1,16 @@
-# VoiceDeck
+# VoiceDuck
 
-VoiceDeck は、指定した通話アプリがマイクを使用している間だけ、他のアプリの音量を自動で下げ、終了後に元の音量へ戻す Windows 向け常駐アプリです。
+VoiceDuck は、指定した通話アプリがマイクを使用している間だけ、他のアプリの音量を自動で下げ、終了後に元の音量へ戻す Windows 向け常駐アプリです。
 
 A lightweight Windows app that lowers other app volumes while selected voice apps are using the microphone.
 
-> **Note:** リポジトリ名や実行ファイル名（`VoiceDuck.App.Wpf.exe`）には開発時の名称「VoiceDuck」が残っていますが、正式なアプリ名は VoiceDeck です。
+> **Note:** リポジトリ名には開発時の名称「VoiceDuck」が残っています。
 
 ## Download
 
-通常利用者は、[GitHub Releases](https://github.com/u10-github/VoiceDuck-public/releases) から `VoiceDuck-SelfContained.zip` をダウンロードしてください。
+通常利用者は、[GitHub Releases](https://github.com/u10-github/VoiceDuck-public/releases) から `VoiceDuck.zip` をダウンロードしてください。
 
-.zip を展開し、`VoiceDuck.App.Wpf.exe` を実行するだけで使えます（.NET ランタイムの追加インストールは不要です）。
+.zip を展開し、`VoiceDuck.exe` を実行するだけで使えます（.NET ランタイムの追加インストールは不要です）。
 
 開発者向けのビルド手順は [Build](#build) セクションを参照してください。
 
