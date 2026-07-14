@@ -1,0 +1,14 @@
+* text=auto eol=lf
+*.cs text diff
+*.csproj text
+*.props text
+*.ps1 text eol=crlf
+*.sln text
+*.md text
+*.txt text
+*.yml text
+*.json text
+*.ico binary
+*.png binary
+*.dll binary
+*.exe binary
