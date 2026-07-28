@@ -8,7 +8,8 @@ public class AudioSessionIdentity : IEquatable<AudioSessionIdentity>
     public string SessionInstanceIdentifier { get; }
 
     public bool IsResolved =>
-        !string.IsNullOrEmpty(RenderDeviceId) && !string.IsNullOrEmpty(SessionInstanceIdentifier);
+        !string.IsNullOrWhiteSpace(RenderDeviceId)
+        && !string.IsNullOrWhiteSpace(SessionInstanceIdentifier);
 
     public AudioSessionIdentity(uint processId, string processName, string renderDeviceId, string sessionInstanceIdentifier)
     {

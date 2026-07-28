@@ -1,10 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
@@ -14,13 +14,10 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
-    <PackageReference Include="FluentAssertions" />
-    <PackageReference Include="NetArchTest.Rules" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\VoiceDuck.Core\VoiceDuck.Core.csproj" />
-    <ProjectReference Include="..\..\src\VoiceDuck.Infrastructure\VoiceDuck.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\VoiceDuck.Extensions.WindowsAudio\VoiceDuck.Extensions.WindowsAudio.csproj" />
   </ItemGroup>
 
   <ItemGroup>

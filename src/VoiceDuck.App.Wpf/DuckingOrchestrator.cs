@@ -14,6 +14,7 @@ public sealed class DuckingOrchestrator : IDisposable
     private readonly string _settingsPath;
     private readonly SimpleLogger _logger;
     private readonly object _gate = new();
+    private readonly DuckingStateSnapshotChangeDetector _stateSnapshotChangeDetector = new();
     private DuckingStateMachine _stateMachine = null!;
     private ApplicationVolumeStateStore _stateStore = null!;
     private VolumeDuckingService _duckingService = null!;
@@ -45,9 +46,20 @@ public sealed class DuckingOrchestrator : IDisposable
         var classifier = new DuckingSessionClassifier();
         _stateStore = new ApplicationVolumeStateStore();
         var volumeWriter = new WindowsAudioSessionVolumeWriter();
-        _duckingService = new VolumeDuckingService(volumeWriter, classifier, _stateStore);
+        var endpointSelector = new WindowsDefaultMultimediaEndpointSelector();
+        var obligationRepoPath = System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "VoiceDuck",
+            "pending-restores.json");
+        var obligationRepo = new RestorationObligationRepository(obligationRepoPath);
+        _duckingService = new VolumeDuckingService(volumeWriter, classifier, _stateStore, obligationRepo, endpointSelector, new SimpleLoggerAdapter(_logger));
         _sessionService = new WindowsAudioSessionService();
         _micService = new WindowsMicrophoneStateService();
+
+        var recovery = _duckingService.LoadAndPopulateStartupState();
+        if (recovery.WasCorrupt)
+            _logger.Warn("Startup recovery: obligation store was corrupt, valid records loaded in-memory");
+        _logger.Info($"Startup recovery: {recovery.LoadedCount} obligation(s) loaded, saved={recovery.Saved}");
 
         _logger.Info($"VoiceDuck started. Settings: {_settingsPath}");
         _logger.Info($"  Ducking ratio: {_settings.Policy.DuckingRatio:F2}, restore delay: {_settings.Policy.RestoreDelaySeconds}s");
@@ -201,8 +213,6 @@ public sealed class DuckingOrchestrator : IDisposable
                         {
                             _restoreDueAt = null;
                             _duckingService.ApplyDucking(sessions, _settings, _currentProcessName);
-                            _logger.Info($"Ducking: {_stateStore.Count} app(s), triggers={string.Join(",", activeTriggerNames)}");
-                            LogStateSummary();
                             break;
                         }
                     case DuckingPhase.WaitingForRestore:
@@ -222,9 +232,6 @@ public sealed class DuckingOrchestrator : IDisposable
                         }
                     case DuckingPhase.Restoring:
                         {
-                            _logger.Info($"Restoring: {_stateStore.Count} app(s)");
-                            LogStateSummary();
-
                             try
                             {
                                 _duckingService.RestoreVolumes(sessions);
@@ -234,6 +241,7 @@ public sealed class DuckingOrchestrator : IDisposable
                                 else
                                     _logger.Warn($"Restore partial: {_stateStore.Count} app(s) retained for deferred restore");
 
+                                LogStateSnapshotIfChanged();
                                 _stateMachine.NotifyRestoreCompleted();
                                 _restoreDueAt = null;
                             }
@@ -252,6 +260,7 @@ public sealed class DuckingOrchestrator : IDisposable
                         }
                 }
 
+                LogStateSnapshotIfChanged();
                 phaseToNotify = _stateMachine.Phase;
                 triggersToNotify = _stateMachine.ActiveTriggerApps
                     .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -282,6 +291,26 @@ public sealed class DuckingOrchestrator : IDisposable
         foreach (var state in _stateStore.GetAll())
         {
             _logger.Info($"  {state.Identity}: baseline={state.BaselineVolume:F2} ducked={state.IsDucked}");
+        }
+    }
+
+    private void LogStateSnapshotIfChanged()
+    {
+        var snapshot = _duckingService.CaptureStateSnapshot(
+            _stateMachine.Phase,
+            _stateMachine.ActiveTriggerApps);
+        if (!_stateSnapshotChangeDetector.ShouldLog(snapshot))
+            return;
+
+        _logger.Info(
+            $"StateSnapshot: phase={snapshot.Phase} endpoint={snapshot.SelectedEndpointId ?? "(none)"} triggers={string.Join(",", snapshot.ActiveTriggers)} tracked={snapshot.Applications.Count}");
+        foreach (var application in snapshot.Applications)
+        {
+            var restoration = application.RestorationStatuses.Count == 0
+                ? "none"
+                : string.Join(",", application.RestorationStatuses);
+            _logger.Info(
+                $"  {application.Identity}: baseline={application.BaselineVolume:F2} ducked={application.IsDucked} restoration={restoration}");
         }
     }
 }

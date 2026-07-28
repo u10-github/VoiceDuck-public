@@ -29,7 +29,7 @@ public class ApplicationAudioSessionGroupTests
         };
 
         var groups = ApplicationAudioSessionGroup.GroupSessions(
-            sessions, "VoiceDuck.exe", classifier, DefaultSettings);
+            sessions, "VoiceDuck.exe", classifier, DefaultSettings, DefaultDevice);
 
         Assert.Single(groups);
         Assert.Equal(2, groups[0].Sessions.Count);
@@ -46,13 +46,13 @@ public class ApplicationAudioSessionGroupTests
         };
 
         var groups = ApplicationAudioSessionGroup.GroupSessions(
-            sessions, "VoiceDuck.exe", classifier, DefaultSettings);
+            sessions, "VoiceDuck.exe", classifier, DefaultSettings, DefaultDevice);
 
         Assert.Equal(2, groups.Count);
     }
 
     [Fact]
-    public void GroupSessions_different_devices_separate()
+    public void GroupSessions_excludes_sessions_outside_relevant_endpoint()
     {
         var classifier = new DuckingSessionClassifier();
         var sessions = new[]
@@ -62,9 +62,11 @@ public class ApplicationAudioSessionGroupTests
         };
 
         var groups = ApplicationAudioSessionGroup.GroupSessions(
-            sessions, "VoiceDuck.exe", classifier, DefaultSettings);
+            sessions, "VoiceDuck.exe", classifier, DefaultSettings, DefaultDevice);
 
-        Assert.Equal(2, groups.Count);
+        var group = Assert.Single(groups);
+        Assert.Single(group.Sessions);
+        Assert.Equal(DefaultDevice, group.Identity.RenderDeviceId);
     }
 
     [Fact]
@@ -78,7 +80,7 @@ public class ApplicationAudioSessionGroupTests
         };
 
         var groups = ApplicationAudioSessionGroup.GroupSessions(
-            sessions, "VoiceDuck.exe", classifier, DefaultSettings);
+            sessions, "VoiceDuck.exe", classifier, DefaultSettings, DefaultDevice);
 
         Assert.Single(groups);
         Assert.Equal("Chrome.exe", groups[0].Sessions[0].Identity.ProcessName);
@@ -95,7 +97,7 @@ public class ApplicationAudioSessionGroupTests
         };
 
         var groups = ApplicationAudioSessionGroup.GroupSessions(
-            sessions, "VoiceDuck.exe", classifier, DefaultSettings);
+            sessions, "VoiceDuck.exe", classifier, DefaultSettings, DefaultDevice);
 
         Assert.Single(groups);
     }
@@ -111,37 +113,39 @@ public class ApplicationAudioSessionGroupTests
         };
 
         var groups = ApplicationAudioSessionGroup.GroupSessions(
-            sessions, "VoiceDuck.exe", classifier, DefaultSettings);
+            sessions, "VoiceDuck.exe", classifier, DefaultSettings, DefaultDevice);
 
         Assert.Single(groups);
     }
 
     [Fact]
-    public void BaselineFromMaxVolume_returns_max()
+    public void SelectBaseline_returns_max_for_consistent_candidates()
     {
         var sessions = new[]
         {
-            Session(100, "Chrome.exe", 0.5f),
+            Session(100, "Chrome.exe", 0.995f),
             Session(200, "Chrome.exe", 1.0f),
         };
 
         var classifier = new DuckingSessionClassifier();
         var groups = ApplicationAudioSessionGroup.GroupSessions(
-            sessions, "VoiceDuck.exe", classifier, DefaultSettings);
+            sessions, "VoiceDuck.exe", classifier, DefaultSettings, DefaultDevice);
 
         Assert.Single(groups);
-        Assert.Equal(1.0f, groups[0].BaselineFromMaxVolume());
+        var selected = Assert.IsType<BaselineSelectionResult.Selected>(groups[0].SelectBaseline());
+        Assert.Equal(1.0f, selected.Baseline);
     }
 
     [Fact]
-    public void BaselineFromMaxVolume_single_session()
+    public void SelectBaseline_single_session()
     {
         var sessions = new[] { Session(100, "Chrome.exe", 0.8f) };
         var classifier = new DuckingSessionClassifier();
         var groups = ApplicationAudioSessionGroup.GroupSessions(
-            sessions, "VoiceDuck.exe", classifier, DefaultSettings);
+            sessions, "VoiceDuck.exe", classifier, DefaultSettings, DefaultDevice);
 
-        Assert.Equal(0.8f, groups[0].BaselineFromMaxVolume());
+        var selected = Assert.IsType<BaselineSelectionResult.Selected>(groups[0].SelectBaseline());
+        Assert.Equal(0.8f, selected.Baseline);
     }
 
     [Fact]
@@ -155,7 +159,7 @@ public class ApplicationAudioSessionGroupTests
         };
 
         var groups = ApplicationAudioSessionGroup.GroupSessions(
-            sessions, "VoiceDuck.exe", classifier, DefaultSettings);
+            sessions, "VoiceDuck.exe", classifier, DefaultSettings, DefaultDevice);
 
         Assert.Single(groups);
     }

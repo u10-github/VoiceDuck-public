@@ -1,3 +1,4 @@
+using VoiceDuck.App.Console;
 using VoiceDuck.Core;
 using VoiceDuck.Extensions.WindowsAudio;
 using VoiceDuck.Infrastructure;
@@ -98,7 +99,14 @@ void RunOneShot(bool duckOnce, bool restore)
     var classifier = new DuckingSessionClassifier();
     var stateStore = new ApplicationVolumeStateStore();
     var volumeWriter = new WindowsAudioSessionVolumeWriter();
-    var duckingService = new VolumeDuckingService(volumeWriter, classifier, stateStore);
+    var endpointSelector = new WindowsDefaultMultimediaEndpointSelector();
+    var obligationRepoPath = System.IO.Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "VoiceDuck",
+        "pending-restores.json");
+    var obligationRepo = new RestorationObligationRepository(obligationRepoPath);
+    var duckingService = DuckingServiceFactory.Create(volumeWriter, classifier, stateStore, obligationRepo, endpointSelector);
+
 
     if (duckOnce)
     {
@@ -198,7 +206,14 @@ void RunContinuousMonitoring()
     var classifier = new DuckingSessionClassifier();
     var stateStore = new ApplicationVolumeStateStore();
     var volumeWriter = new WindowsAudioSessionVolumeWriter();
-    var duckingService = new VolumeDuckingService(volumeWriter, classifier, stateStore);
+    var endpointSelector = new WindowsDefaultMultimediaEndpointSelector();
+    var obligationRepoPath = System.IO.Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "VoiceDuck",
+        "pending-restores.json");
+    var obligationRepo = new RestorationObligationRepository(obligationRepoPath);
+    var duckingService = DuckingServiceFactory.Create(volumeWriter, classifier, stateStore, obligationRepo, endpointSelector);
+
     var sessionService = new WindowsAudioSessionService();
     var micService = new WindowsMicrophoneStateService();
     DateTimeOffset? restoreDueAt = null;

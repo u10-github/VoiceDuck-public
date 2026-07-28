@@ -15,4 +15,8 @@
     <ProjectReference Include="..\VoiceDuck.Core\VoiceDuck.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="VoiceDuck.Extensions.WindowsAudio.Tests" />
+  </ItemGroup>
+
 </Project>

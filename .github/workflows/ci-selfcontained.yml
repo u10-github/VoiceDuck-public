@@ -1,0 +1,65 @@
+name: CI + SelfContained Build
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore
+
+      - name: Run tests
+        run: dotnet test --no-build --no-restore
+
+      - name: Format check
+        run: dotnet format --verify-no-changes --no-restore
+
+      - name: Architecture tests
+        run: dotnet test --no-build --no-restore --filter "ArchitectureTests"
+
+      - name: Publish self-contained win-x64
+        shell: pwsh
+        run: ./scripts/publish-self-contained.ps1
+
+      - name: Compute SHA-256 and record evidence
+        shell: pwsh
+        run: |
+          $zip = "dist/VoiceDuck.zip"
+          if (-not (Test-Path $zip)) { throw "ZIP not found at $zip" }
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          $hash | Out-File -FilePath dist/VoiceDuck.zip.sha256 -Encoding ascii
+          $commit = git rev-parse HEAD
+          @"
+          Commit: $commit
+          RID: win-x64
+          Publish command: ./scripts/publish-self-contained.ps1
+          ZIP: VoiceDuck.zip
+          Size: $((Get-Item $zip).Length) bytes
+          SHA-256: $hash
+          Executable: VoiceDuck.exe
+          Actions run: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID
+          Artifact: VoiceDuck-selfcontained (download from Actions run page)
+          "@ | Out-File -FilePath dist/artifact-evidence.txt -Encoding utf8
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoiceDuck-selfcontained
+          path: |
+            dist/VoiceDuck.zip
+            dist/VoiceDuck.zip.sha256
+            dist/artifact-evidence.txt

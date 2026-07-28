@@ -11,33 +11,36 @@ public sealed class ApplicationAudioSessionGroup
         Sessions = sessions ?? throw new ArgumentNullException(nameof(sessions));
     }
 
-    public float BaselineFromMaxVolume()
+    public BaselineSelectionResult SelectBaseline()
     {
-        return Sessions.Max(s => s.Volume);
+        return BaselineSelectionPolicy.Select(Sessions.Select(s => s.Volume));
     }
 
     public static IReadOnlyList<ApplicationAudioSessionGroup> GroupSessions(
         IReadOnlyList<AudioSessionInfo> sessions,
         string voiceDuckProcessName,
         DuckingSessionClassifier classifier,
-        VoiceDuckSettings settings)
+        VoiceDuckSettings settings,
+        string? relevantEndpointId,
+        Action<AudioSessionInfo, ControlEligibilityResult.Rejected>? onRejected = null)
     {
         var groups = new Dictionary<ApplicationAudioIdentity, List<AudioSessionInfo>>();
 
         foreach (var session in sessions)
         {
-            if (session.Identity.ProcessId == 0 || !session.Identity.IsResolved)
+            var decision = classifier.Classify(
+                session,
+                relevantEndpointId,
+                settings,
+                voiceDuckProcessName);
+            if (decision is ControlEligibilityResult.Rejected rejected)
+            {
+                onRejected?.Invoke(session, rejected);
                 continue;
-
-            if (string.IsNullOrEmpty(session.ExecutablePath))
-                continue;
-
-            var decision = classifier.Classify(session, settings, voiceDuckProcessName);
-            if (decision.Outcome == DuckingOutcome.Protect)
-                continue;
+            }
 
             var appIdentity = new ApplicationAudioIdentity(
-                session.Identity.RenderDeviceId, session.ExecutablePath);
+                session.Identity.RenderDeviceId, session.ExecutablePath!);
 
             if (!groups.ContainsKey(appIdentity))
                 groups[appIdentity] = new List<AudioSessionInfo>();
